@@ -5,13 +5,14 @@ import {
     Banknote,
     CheckCircle,
     CreditCard,
-    Printer,
+    Receipt,
     QrCode,
     SplitSquareHorizontal,
     X,
 } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { cn, formatCurrency } from "@/lib/utils";
+import { ReceiptModal } from "@/components/pos/receipt-modal";
 
 interface PaymentModalProps {
     onClose: () => void;
@@ -35,6 +36,9 @@ export function PaymentModal({ onClose, total }: PaymentModalProps) {
     const [cashGiven, setCashGiven] = useState("");
     const [splitCash, setSplitCash] = useState(String(Math.floor(total / 2)));
     const [success, setSuccess] = useState(false);
+    const [showReceipt, setShowReceipt] = useState(false);
+    const [orderNumber, setOrderNumber] = useState("");
+    const [checkoutDate, setCheckoutDate] = useState<Date>(new Date());
 
     const cashAmount = parseFloat(cashGiven) || 0;
     const change = cashAmount - total;
@@ -48,17 +52,15 @@ export function PaymentModal({ onClose, total }: PaymentModalProps) {
 
     const handleProcess = () => {
         if (!canProcess()) return;
+        setOrderNumber(Math.floor(100000 + Math.random() * 900000).toString());
+        setCheckoutDate(new Date());
         setSuccess(true);
-        setTimeout(() => {
-            clearCart();
-            onClose();
-        }, 2500);
     };
 
     if (success) {
         return (
             <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-                <div className="bg-card border border-border rounded-2xl p-12 text-center max-w-sm mx-4 animate-fade-in">
+                <div className="bg-card border border-border rounded-2xl p-12 text-center max-w-sm mx-4 animate-fade-in relative">
                     <div className="w-20 h-20 rounded-full bg-emerald-400/20 flex items-center justify-center mx-auto mb-6">
                         <CheckCircle className="w-10 h-10 text-emerald-400" />
                     </div>
@@ -73,9 +75,11 @@ export function PaymentModal({ onClose, total }: PaymentModalProps) {
                         </div>
                     )}
                     <div className="flex gap-2 mt-4">
-                        <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
-                            <Printer className="w-4 h-4" />
-                            Print Receipt
+                        <button
+                            onClick={() => setShowReceipt(true)}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm text-foreground hover:bg-muted transition-colors font-medium">
+                            <Receipt className="w-4 h-4" />
+                            View Receipt
                         </button>
                         <button
                             onClick={() => { clearCart(); onClose(); }}
@@ -85,6 +89,22 @@ export function PaymentModal({ onClose, total }: PaymentModalProps) {
                         </button>
                     </div>
                 </div>
+
+                {showReceipt && (
+                    <ReceiptModal
+                        onClose={() => setShowReceipt(false)}
+                        items={items}
+                        subtotal={getSubtotal()}
+                        tax={getTax()}
+                        discount={getDiscount()}
+                        total={total}
+                        paymentMethod={method}
+                        amountPaid={method === "cash" ? cashAmount : method === "split" ? parseFloat(splitCash) + splitCard : total}
+                        change={method === "cash" ? change : undefined}
+                        date={checkoutDate}
+                        orderNumber={orderNumber}
+                    />
+                )}
             </div>
         );
     }
@@ -292,3 +312,4 @@ export function PaymentModal({ onClose, total }: PaymentModalProps) {
         </div>
     );
 }
+
