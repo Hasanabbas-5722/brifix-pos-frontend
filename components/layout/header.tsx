@@ -3,7 +3,7 @@
 import { Bell, Menu, Moon, Search, Sun, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const pageTitles: Record<string, string> = {
     "/dashboard": "Dashboard",
@@ -25,11 +25,25 @@ export function Header({ onMenuClick }: HeaderProps) {
     const { theme, setTheme } = useTheme();
     const pathname = usePathname();
     const [searchOpen, setSearchOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
+    const [currentTime, setCurrentTime] = useState<string>("");
+
+    useEffect(() => {
+        setMounted(true);
+        setCurrentTime(new Date().toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        }));
+    }, []);
 
     const title =
         Object.entries(pageTitles).find(([key]) => pathname.startsWith(key))?.[1] ??
         "BriFix POS";
 
+    // Prevent hydration mismatch by keeping the structure STABLE
+    // and only rendering client-dependent parts after mounting.
     return (
         <header className="h-14 md:h-16 flex items-center gap-2 md:gap-4 px-3 md:px-5 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-40 flex-shrink-0">
             {/* Hamburger (mobile) */}
@@ -43,17 +57,18 @@ export function Header({ onMenuClick }: HeaderProps) {
 
             {/* Page title */}
             <div className="flex-1 min-w-0">
-                <h1 className="text-sm md:text-base font-semibold text-foreground truncate">
-                    {title}
-                </h1>
-                <p className="text-[10px] md:text-xs text-muted-foreground hidden sm:block">
-                    {new Date().toLocaleDateString("en-US", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                    })}
-                </p>
+                {!mounted ? (
+                    <div className="h-5 w-32 bg-muted rounded animate-pulse" />
+                ) : (
+                    <>
+                        <h1 className="text-sm md:text-base font-semibold text-foreground truncate">
+                            {title}
+                        </h1>
+                        <p className="text-[10px] md:text-xs text-muted-foreground hidden sm:block">
+                            {currentTime}
+                        </p>
+                    </>
+                )}
             </div>
 
             {/* Mobile search modal */}
@@ -105,7 +120,13 @@ export function Header({ onMenuClick }: HeaderProps) {
                     className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     aria-label="Toggle theme"
                 >
-                    {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                    {!mounted ? (
+                        <div className="w-5 h-5" />
+                    ) : theme === "dark" ? (
+                        <Sun className="w-5 h-5" />
+                    ) : (
+                        <Moon className="w-5 h-5" />
+                    )}
                 </button>
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary cursor-pointer hover:bg-primary/30 transition-colors">
                     AT

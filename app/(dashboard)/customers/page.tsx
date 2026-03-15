@@ -2,31 +2,68 @@
 
 import { useState } from "react";
 import { Mail, Phone, Plus, Search, Star, TrendingUp, Users, X } from "lucide-react";
-import { CUSTOMERS } from "@/lib/data";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { Customer } from "@/lib/types";
+import { customersApi } from "@/lib/api/apis";
+import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function CustomersPage() {
     const [search, setSearch] = useState("");
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
     const [showAdd, setShowAdd] = useState(false);
 
-    const filtered = CUSTOMERS.filter((c) => {
+    const handleFormSuccess = () => {
+        setShowAdd(false);
+        setEditCustomer(null);
+        setSelectedCustomer(null);
+        loadCustomers();
+    };
+
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const loadCustomers = async () => {
+        setIsLoading(true);
+        try {
+            const data = await customersApi.getAll();
+            setCustomers(data || []);
+        } catch (err) {
+            console.error("Failed to load customers", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadCustomers();
+    }, []);
+
+    const filtered = customers.filter((c) => {
         const q = search.toLowerCase();
         return !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.phone.includes(q);
     });
 
-    const totalRevenue = CUSTOMERS.reduce((s, c) => s + c.totalSpent, 0);
-    const totalPoints = CUSTOMERS.reduce((s, c) => s + c.loyaltyPoints, 0);
+    const totalRevenue = customers.reduce((s, c) => s + c.totalSpent, 0);
+    const totalPoints = customers.reduce((s, c) => s + c.loyaltyPoints, 0);
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 md:p-6 space-y-4 md:space-y-5 animate-fade-in">
             {/* Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                    { label: "Total Customers", value: CUSTOMERS.length, icon: Users, color: "text-blue-400" },
+                    { label: "Total Customers", value: customers.length, icon: Users, color: "text-blue-400" },
                     { label: "Total Revenue", value: formatCurrency(totalRevenue), icon: TrendingUp, color: "text-emerald-400" },
-                    { label: "Avg Spent", value: formatCurrency(totalRevenue / CUSTOMERS.length), icon: TrendingUp, color: "text-violet-400" },
+                    { label: "Avg Spent", value: formatCurrency(customers.length ? totalRevenue / customers.length : 0), icon: TrendingUp, color: "text-violet-400" },
                     { label: "Total Points", value: totalPoints.toLocaleString(), icon: Star, color: "text-amber-400" },
                 ].map((s) => {
                     const Icon = s.icon;
@@ -116,14 +153,43 @@ export default function CustomersPage() {
             )}
 
             {selectedCustomer && (
-                <CustomerDetailModal customer={selectedCustomer} onClose={() => setSelectedCustomer(null)} />
+                <CustomerDetailModal
+                    customer={selectedCustomer}
+                    onClose={() => setSelectedCustomer(null)}
+                    onEdit={(c) => { setEditCustomer(c); setSelectedCustomer(null); }}
+                    onDeleteSuccess={handleFormSuccess}
+                />
             )}
-            {showAdd && <AddCustomerModal onClose={() => setShowAdd(false)} />}
+            {(showAdd || editCustomer) && (
+                <CustomerFormModal
+                    customer={editCustomer}
+                    onClose={() => { setShowAdd(false); setEditCustomer(null); }}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
         </div>
     );
 }
 
-function CustomerDetailModal({ customer, onClose }: { customer: Customer; onClose: () => void }) {
+interface CustomerDetailModalProps {
+    customer: Customer;
+    onClose: () => void;
+    onEdit: (c: Customer) => void;
+    onDeleteSuccess: () => void;
+}
+
+function CustomerDetailModal({ customer, onClose, onEdit, onDeleteSuccess }: CustomerDetailModalProps) {
+    const handleDelete = async () => {
+        if (confirm(`Are you sure you want to delete ${customer.name}?`)) {
+            try {
+                await customersApi.delete(customer.id);
+                onDeleteSuccess();
+            } catch (err) {
+                alert("Failed to delete customer.");
+            }
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
             <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl animate-slide-in sm:animate-fade-in overflow-y-auto max-h-[90vh]">
@@ -161,6 +227,7 @@ function CustomerDetailModal({ customer, onClose }: { customer: Customer; onClos
                             { label: "Member Since", value: formatDate(customer.createdAt) },
                             { label: "Last Visit", value: formatDate(customer.lastVisit) },
                             { label: "Address", value: customer.address },
+                            { label: "GST Number", value: customer.gstNumber || "Not provided" },
                         ].map((row) => (
                             <div key={row.label} className="flex justify-between py-2 border-b border-border last:border-0">
                                 <span className="text-muted-foreground">{row.label}</span>
@@ -181,39 +248,100 @@ function CustomerDetailModal({ customer, onClose }: { customer: Customer; onClos
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5">{Math.max(0, 5000 - customer.loyaltyPoints)} points to Gold status</p>
                     </div>
+
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            onClick={() => onEdit(customer)}
+                            className="flex-1 py-2.5 rounded-xl border border-border text-sm text-foreground hover:bg-muted transition-colors font-medium">
+                            Edit Profile
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="flex-1 py-2.5 rounded-xl border border-red-400/20 text-sm text-red-400 hover:bg-red-400/10 transition-colors font-medium">
+                            Delete
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
 
-function AddCustomerModal({ onClose }: { onClose: () => void }) {
+function CustomerFormModal({ customer, onClose, onSuccess }: { customer: Customer | null; onClose: () => void; onSuccess: () => void }) {
+    const isEdit = !!customer;
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        const form = e.currentTarget;
+        const formData = new FormData(form);
+
+        const payload = {
+            name: formData.get("name") as string,
+            email: formData.get("email") as string,
+            phone: formData.get("phone") as string,
+            address: formData.get("address") as string,
+            gstNumber: formData.get("gstNumber") as string,
+            avatar: (formData.get("name") as string)?.charAt(0).toUpperCase() || "C",
+        };
+
+        try {
+            if (isEdit && customer?.id) {
+                await customersApi.update(customer.id, payload);
+            } else {
+                await customersApi.create(payload);
+            }
+            onSuccess();
+        } catch (error) {
+            console.error("Failed to save customer", error);
+            alert("Failed to save customer.");
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
             <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl animate-slide-in sm:animate-fade-in">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-                    <h2 className="font-bold text-foreground">Add Customer</h2>
-                    <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-                <div className="p-6 space-y-4">
-                    {[
-                        { label: "Full Name *", placeholder: "John Doe" },
-                        { label: "Email Address *", placeholder: "john@example.com", type: "email" },
-                        { label: "Phone Number *", placeholder: "+1 (555) 000-0000", type: "tel" },
-                        { label: "Address", placeholder: "123 Main St, City, State" },
-                    ].map((f) => (
-                        <div key={f.label}>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{f.label}</label>
-                            <input type={f.type ?? "text"} placeholder={f.placeholder} className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary" />
-                        </div>
-                    ))}
-                    <div className="flex gap-3 pt-2">
-                        <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium">Cancel</button>
-                        <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">Add Customer</button>
+                <form onSubmit={handleSubmit}>
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                        <h2 className="font-bold text-foreground">{isEdit ? "Edit Customer" : "Add Customer"}</h2>
+                        <button type="button" onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
                     </div>
-                </div>
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Full Name *</label>
+                            <input name="name" required defaultValue={customer?.name} placeholder="John Doe" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Email Address *</label>
+                            <input name="email" required type="email" defaultValue={customer?.email} placeholder="john@example.com" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Phone Number *</label>
+                            <input name="phone" required type="tel" defaultValue={customer?.phone} placeholder="+1 (555) 000-0000" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Address</label>
+                            <input name="address" defaultValue={customer?.address} placeholder="123 Main St, City, State" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">GST Number (Optional)</label>
+                            <input name="gstNumber" defaultValue={customer?.gstNumber} placeholder="22AAAAA0000A1Z5" className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary font-mono uppercase" />
+                        </div>
+
+                        <div className="flex gap-3 pt-4 border-t border-border mt-4">
+                            <button type="button" onClick={onClose} disabled={isLoading} className="flex-1 py-3 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium">Cancel</button>
+                            <button type="submit" disabled={isLoading} className="flex-1 py-3 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {isEdit ? "Save Changes" : "Add Customer"}
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     );

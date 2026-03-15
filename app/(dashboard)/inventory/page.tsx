@@ -3,16 +3,61 @@
 import { useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Package, Plus, Search, SlidersHorizontal, TruckIcon, X } from "lucide-react";
 import { PRODUCTS, SUPPLIERS } from "@/lib/data";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatCurrency } from "@/lib/utils";
 import type { Product } from "@/lib/types";
+import { inventoryApi } from "@/lib/api/apis";
+import { useEffect } from "react";
+import { Loader2, PlusCircle } from "lucide-react";
+import Link from "next/link";
+
+interface InventoryItem {
+    id: string;
+    name: string;
+    sku: string;
+    stock: number;
+    minStock: number;
+    unit: string;
+    category: string;
+    status: 'in_stock' | 'low' | 'out_of_stock';
+    image?: string;
+}
 
 export default function InventoryPage() {
     const [search, setSearch] = useState("");
     const [filterStock, setFilterStock] = useState("all");
-    const [showAdjust, setShowAdjust] = useState<Product | null>(null);
-    const [activeTab, setActiveTab] = useState<"stock" | "suppliers">("stock");
+    const [showAdjust, setShowAdjust] = useState<any | null>(null);
+    const [inventory, setInventory] = useState<InventoryItem[]>([]);
+    const [transactions, setTransactions] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<"stock" | "transactions" | "suppliers">("stock");
 
-    const filtered = PRODUCTS.filter((p) => {
+    const loadInventory = async () => {
+        setIsLoading(true);
+        try {
+            const data = await inventoryApi.getAll();
+            setInventory(data || []);
+        } catch (err) {
+            console.error("Failed to load inventory", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loadTransactions = async () => {
+        try {
+            const data = await inventoryApi.getTransactions();
+            setTransactions(data || []);
+        } catch (err) {
+            console.error("Failed to load transactions", err);
+        }
+    };
+
+    useEffect(() => {
+        loadInventory();
+        loadTransactions();
+    }, []);
+
+    const filtered = inventory.filter((p) => {
         const q = search.toLowerCase();
         const matchSearch = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
         if (filterStock === "out") return matchSearch && p.stock === 0;
@@ -21,9 +66,17 @@ export default function InventoryPage() {
         return matchSearch;
     });
 
-    const outCount = PRODUCTS.filter((p) => p.stock === 0).length;
-    const lowCount = PRODUCTS.filter((p) => p.stock > 0 && p.stock <= p.minStock).length;
-    const okCount = PRODUCTS.filter((p) => p.stock > p.minStock).length;
+    const outCount = inventory.filter((p) => p.stock === 0).length;
+    const lowCount = inventory.filter((p) => p.stock > 0 && p.stock <= p.minStock).length;
+    const okCount = inventory.filter((p) => p.stock > p.minStock).length;
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 md:p-6 space-y-4 md:space-y-5 animate-fade-in">
@@ -45,13 +98,13 @@ export default function InventoryPage() {
 
             {/* Tabs */}
             <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit">
-                {["stock", "suppliers"].map((tab) => (
+                {["stock", "transactions", "suppliers"].map((tab) => (
                     <button
                         key={tab}
-                        onClick={() => setActiveTab(tab as "stock" | "suppliers")}
+                        onClick={() => setActiveTab(tab as any)}
                         className={cn("px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium capitalize transition-all whitespace-nowrap", activeTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
                     >
-                        {tab === "stock" ? "📦 Stock" : "🚚 Suppliers"}
+                        {tab === "stock" ? "📦 Stock" : tab === "transactions" ? "📑 History" : "🚚 Suppliers"}
                     </button>
                 ))}
             </div>
@@ -64,11 +117,18 @@ export default function InventoryPage() {
                             <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search inventory..." className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none min-w-0" />
                         </div>
-                        <div className="flex gap-2 overflow-x-auto scrollbar-none">
+                        <div className="flex gap-2 overflow-x-auto scrollbar-none flex-1">
                             {[{ id: "all", label: "All" }, { id: "ok", label: "✅ In Stock" }, { id: "low", label: "⚠️ Low" }, { id: "out", label: "❌ Out" }].map((f) => (
                                 <button key={f.id} onClick={() => setFilterStock(f.id)} className={cn("px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0", filterStock === f.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{f.label}</button>
                             ))}
                         </div>
+                        <Link
+                            href="/products/add"
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Product
+                        </Link>
                     </div>
 
                     {/* Mobile: Card list */}
@@ -167,6 +227,35 @@ export default function InventoryPage() {
                         </div>
                     </div>
                 </>
+            ) : activeTab === "transactions" ? (
+                <div className="bg-card border border-border rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted/30 border-b border-border">
+                                <tr>
+                                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase">Date</th>
+                                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase">Product</th>
+                                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase">Change</th>
+                                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {transactions.map((t) => (
+                                    <tr key={t.id} className="hover:bg-muted/10 transition-colors">
+                                        <td className="px-4 py-3 text-muted-foreground">{formatDate(t.createdAt)}</td>
+                                        <td className="px-4 py-3 font-medium text-foreground">{t.productName}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={cn("px-2 py-1 rounded-full text-xs font-bold", t.type === 'in' ? "bg-emerald-400/10 text-emerald-400" : "bg-red-400/10 text-red-400")}>
+                                                {t.type === 'in' ? '+' : '-'}{t.quantity}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">{t.reason}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                     {SUPPLIERS.map((supplier) => (
@@ -198,20 +287,41 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {showAdjust && <AdjustStockModal product={showAdjust} onClose={() => setShowAdjust(null)} />}
+            {showAdjust && <AdjustStockModal
+                product={showAdjust as any}
+                onClose={() => setShowAdjust(null)}
+                onSuccess={() => {
+                    loadInventory();
+                    loadTransactions();
+                    setShowAdjust(null);
+                }}
+            />}
         </div>
     );
 }
 
-function AdjustStockModal({ product, onClose }: { product: Product; onClose: () => void }) {
-    const [type, setType] = useState<"add" | "remove" | "set">("add");
+function AdjustStockModal({ product, onClose, onSuccess }: { product: any; onClose: () => void; onSuccess: () => void }) {
+    const [isLoading, setIsLoading] = useState(false);
     const [amount, setAmount] = useState("");
+    const [reason, setReason] = useState("Stock received from supplier");
 
-    const newStock = () => {
-        const n = parseInt(amount) || 0;
-        if (type === "add") return product.stock + n;
-        if (type === "remove") return Math.max(0, product.stock - n);
-        return n;
+    const handleApply = async () => {
+        const qty = parseInt(amount);
+        if (!qty || qty <= 0) return;
+
+        setIsLoading(true);
+        try {
+            await inventoryApi.add({
+                productId: product.id,
+                quantity: qty,
+                reason: reason
+            });
+            onSuccess();
+        } catch (err) {
+            alert("Failed to update stock");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -228,41 +338,39 @@ function AdjustStockModal({ product, onClose }: { product: Product; onClose: () 
                         <span className="text-sm text-muted-foreground">Current Stock</span>
                         <span className="text-xl font-bold text-foreground">{product.stock} {product.unit}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                        {[{ id: "add", label: "Add", icon: ArrowUp, color: "text-emerald-400" }, { id: "remove", label: "Remove", icon: ArrowDown, color: "text-red-400" }, { id: "set", label: "Set", icon: SlidersHorizontal, color: "text-blue-400" }].map((t) => {
-                            const Icon = t.icon;
-                            return (
-                                <button key={t.id} onClick={() => setType(t.id as typeof type)} className={cn("flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all", type === t.id ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}>
-                                    <Icon className={`w-4 h-4 ${type === t.id ? "" : t.color}`} />
-                                    {t.label}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    {/* Simplified: We only support adding/stock-in for now as per user request */}
                     <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Quantity</label>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Quantity Added</label>
                         <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" min="0" className="w-full px-3 py-3 rounded-xl border border-border bg-background text-2xl font-bold text-foreground outline-none focus:border-primary text-center" />
                     </div>
                     {amount && (
                         <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20">
                             <span className="text-sm text-muted-foreground">New Stock</span>
-                            <span className="text-lg font-bold text-primary">{newStock()} {product.unit}</span>
+                            <span className="text-lg font-bold text-primary">{(product.stock || 0) + (parseInt(amount) || 0)} {product.unit}</span>
                         </div>
                     )}
                     <div>
                         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Reason</label>
-                        <select className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary">
-                            <option value="">Select reason...</option>
+                        <select
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                        >
                             <option>Stock received from supplier</option>
-                            <option>Damaged goods</option>
                             <option>Manual count adjustment</option>
                             <option>Return from customer</option>
-                            <option>Internal use</option>
                         </select>
                     </div>
                     <div className="flex gap-3">
-                        <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium">Cancel</button>
-                        <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">Apply</button>
+                        <button onClick={onClose} disabled={isLoading} className="flex-1 py-3 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium">Cancel</button>
+                        <button
+                            onClick={handleApply}
+                            disabled={isLoading || !amount}
+                            className="flex-1 py-3 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                            Apply
+                        </button>
                     </div>
                 </div>
             </div>

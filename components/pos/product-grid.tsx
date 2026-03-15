@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { PRODUCTS } from "@/lib/data";
-import type { ProductCategory } from "@/lib/types";
+import { useState, useEffect, useMemo } from "react";
+import type { ProductCategory, Product } from "@/lib/types";
+import { productsApi } from "@/lib/api/apis";
 import { ProductCard } from "@/components/pos/product-card";
-import { Package } from "lucide-react";
+import { Package, Loader2 } from "lucide-react";
 
 interface ProductGridProps {
     search: string;
@@ -12,19 +12,38 @@ interface ProductGridProps {
 }
 
 export function ProductGrid({ search, category }: ProductGridProps) {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsLoading(true);
+        productsApi.getAll()
+            .then(data => setProducts(data || []))
+            .catch(err => console.error("Failed to fetch products for POS", err))
+            .finally(() => setIsLoading(false));
+    }, []);
+
     const filtered = useMemo(() => {
-        return PRODUCTS.filter((p) => {
+        return products.filter((p) => {
             const matchesCategory = category === "all" || p.category === category;
             const q = search.toLowerCase();
             const matchesSearch =
                 !q ||
                 p.name.toLowerCase().includes(q) ||
                 p.sku.toLowerCase().includes(q) ||
-                p.barcode.includes(q) ||
-                p.description.toLowerCase().includes(q);
+                p.barcode?.includes(q) ||
+                p.description?.toLowerCase().includes(q);
             return matchesCategory && matchesSearch;
         });
-    }, [search, category]);
+    }, [search, category, products]);
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     if (filtered.length === 0) {
         return (

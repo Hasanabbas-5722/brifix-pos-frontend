@@ -10,6 +10,7 @@ interface CartStore {
     globalDiscountType: "percentage" | "fixed";
     taxRate: number;
     note: string;
+    companyGst: string;
 
     // Actions
     addItem: (product: Product) => void;
@@ -20,6 +21,7 @@ interface CartStore {
     setCustomer: (customer: Customer | null) => void;
     setGlobalDiscount: (discount: number, type: "percentage" | "fixed") => void;
     setNote: (note: string) => void;
+    setCompanyGst: (gst: string) => void;
     clearCart: () => void;
 
     // Computed getters
@@ -39,6 +41,7 @@ export const useCartStore = create<CartStore>()(
             globalDiscountType: "percentage",
             taxRate: 8.5,
             note: "",
+            companyGst: "",
 
             addItem: (product) => {
                 const items = get().items;
@@ -105,6 +108,7 @@ export const useCartStore = create<CartStore>()(
             setGlobalDiscount: (discount, type) =>
                 set({ globalDiscount: discount, globalDiscountType: type }),
             setNote: (note) => set({ note }),
+            setCompanyGst: (gst) => set({ companyGst: gst }),
 
             clearCart: () =>
                 set({
@@ -134,10 +138,16 @@ export const useCartStore = create<CartStore>()(
             },
 
             getTax: () => {
+                const { companyGst, customer, taxRate } = get();
+                const hasGst = (companyGst && companyGst.trim().length > 0) || 
+                              (customer && customer.gstNumber && customer.gstNumber.trim().length > 0);
+                
+                if (!hasGst) return 0;
+
                 const subtotal = get().getSubtotal();
                 const discount = get().getDiscount();
                 const taxableAmount = subtotal - discount;
-                return calculateTax(taxableAmount, get().taxRate);
+                return calculateTax(taxableAmount, taxRate);
             },
 
             getTotal: () => {

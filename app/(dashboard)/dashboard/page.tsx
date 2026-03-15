@@ -25,51 +25,10 @@ import {
     Pie,
     Cell,
 } from "recharts";
-import { SALES_DATA, TOP_PRODUCTS, MONTHLY_REVENUE, PRODUCTS, ORDERS } from "@/lib/data";
 import { formatCurrency, formatDate } from "@/lib/utils";
-
-const stats = [
-    {
-        title: "Today's Revenue",
-        value: "$1,840.50",
-        change: "+12.5%",
-        trend: "up",
-        icon: DollarSign,
-        color: "text-emerald-400",
-        bg: "bg-emerald-400/10",
-        desc: "vs yesterday $1,635.80",
-    },
-    {
-        title: "Orders Today",
-        value: "73",
-        change: "+8.2%",
-        trend: "up",
-        icon: ShoppingBag,
-        color: "text-blue-400",
-        bg: "bg-blue-400/10",
-        desc: "vs yesterday 67 orders",
-    },
-    {
-        title: "New Customers",
-        value: "12",
-        change: "-3.1%",
-        trend: "down",
-        icon: Users,
-        color: "text-violet-400",
-        bg: "bg-violet-400/10",
-        desc: "vs yesterday 13 customers",
-    },
-    {
-        title: "Avg Order Value",
-        value: "$25.21",
-        change: "+2.4%",
-        trend: "up",
-        icon: CreditCard,
-        color: "text-amber-400",
-        bg: "bg-amber-400/10",
-        desc: "vs yesterday $24.62",
-    },
-];
+import { dashboardApi, productsApi, ordersApi } from "@/lib/api/apis";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 const PIE_COLORS = ["#8b5cf6", "#f59e0b", "#3b82f6", "#ec4899", "#10b981", "#ef4444"];
 
@@ -82,12 +41,83 @@ const categoryData = [
     { name: "Other", value: 3 },
 ];
 
-const lowStockProducts = PRODUCTS.filter((p) => p.stock <= p.minStock && p.stock > 0);
-const outOfStockProducts = PRODUCTS.filter((p) => p.stock === 0);
-
 export default function DashboardPage() {
-    const recentOrders = ORDERS.slice(0, 5);
-    const weekData = SALES_DATA.slice(-7);
+    const [statsData, setStatsData] = useState<any>(null);
+    const [products, setProducts] = useState<any[]>([]);
+    const [orders, setOrders] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        Promise.all([
+            dashboardApi.getStats(),
+            productsApi.getAll(),
+            ordersApi.getAll(),
+        ]).then(([dStats, dProducts, dOrders]) => {
+            setStatsData(dStats);
+            setProducts(dProducts);
+            setOrders(dOrders);
+        }).catch(err => console.error("Failed to load dashboard data", err))
+            .finally(() => setIsLoading(false));
+    }, []);
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    const lowStockProducts = products.filter((p: any) => p.stock <= p.minStock && p.stock > 0);
+    const outOfStockProducts = products.filter((p: any) => p.stock === 0);
+
+    const recentOrders = orders.slice(0, 5);
+    const weekData = statsData?.sales_data || [];
+    const monthlyRevenue = statsData?.monthly_revenue || [];
+    const topProducts = statsData?.top_products || [];
+
+    const stats = [
+        {
+            title: "Today's Revenue",
+            value: formatCurrency(statsData?.today_revenue || 0),
+            change: "+12.5%",
+            trend: "up",
+            icon: DollarSign,
+            color: "text-emerald-400",
+            bg: "bg-emerald-400/10",
+            desc: "vs yesterday",
+        },
+        {
+            title: "Orders Today",
+            value: (statsData?.today_orders || 0).toString(),
+            change: "+8.2%",
+            trend: "up",
+            icon: ShoppingBag,
+            color: "text-blue-400",
+            bg: "bg-blue-400/10",
+            desc: "vs yesterday",
+        },
+        {
+            title: "New Customers",
+            value: "12",
+            change: "-3.1%",
+            trend: "down",
+            icon: Users,
+            color: "text-violet-400",
+            bg: "bg-violet-400/10",
+            desc: "vs yesterday",
+        },
+        {
+            title: "Avg Order Value",
+            value: formatCurrency(statsData?.avg_order_value || 0),
+            change: "+2.4%",
+            trend: "up",
+            icon: CreditCard,
+            color: "text-amber-400",
+            bg: "bg-amber-400/10",
+            desc: "vs yesterday",
+        },
+    ];
 
     return (
         <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
@@ -318,8 +348,8 @@ export default function DashboardPage() {
                         </Link>
                     </div>
                     <div className="space-y-3">
-                        {TOP_PRODUCTS.slice(0, 5).map((product, index) => {
-                            const maxRevenue = TOP_PRODUCTS[0].revenue;
+                        {topProducts.slice(0, 5).map((product: any, index: number) => {
+                            const maxRevenue = topProducts[0]?.revenue || 1;
                             const pct = (product.revenue / maxRevenue) * 100;
                             return (
                                 <div key={product.name} className="space-y-1">
@@ -358,7 +388,7 @@ export default function DashboardPage() {
                     </Link>
                 </div>
                 <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={MONTHLY_REVENUE}>
+                    <BarChart data={monthlyRevenue}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                         <XAxis
                             dataKey="month"

@@ -46,6 +46,7 @@ export interface Customer {
     createdAt: string;
     lastVisit: string;
     avatar: string;
+    gstNumber?: string;
 }
 
 export interface Order {
@@ -57,8 +58,10 @@ export interface Order {
     discount: number;
     tax: number;
     total: number;
-    paymentMethod: "cash" | "card" | "qr" | "split";
-    paymentStatus: "paid" | "pending" | "refunded" | "partial";
+    paymentMethod: "cash" | "card" | "qr" | "split" | "loyalty" | "storeCredit";
+    amountPaid: number;
+    amountDue: number;
+    paymentStatus: "paid" | "pending" | "refunded" | "partial" | "unpaid";
     status: "completed" | "pending" | "cancelled" | "refunded";
     cashier: string;
     createdAt: string;
@@ -114,4 +117,5 @@ export interface StoreSettings {
     currency: string;
     receiptFooter: string;
     timezone: string;
+    gstNumber?: string;
 }

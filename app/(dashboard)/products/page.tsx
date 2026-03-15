@@ -10,10 +10,15 @@ import {
     X,
     Package,
     CheckCircle,
+    PlusCircle,
 } from "lucide-react";
-import { PRODUCTS, CATEGORIES, CATEGORY_COLORS } from "@/lib/data";
+import Link from "next/link";
+import { CATEGORIES, CATEGORY_COLORS } from "@/lib/data";
 import { formatCurrency, cn } from "@/lib/utils";
 import type { Product, ProductCategory } from "@/lib/types";
+import { productsApi } from "@/lib/api/apis";
+import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function ProductsPage() {
     const [search, setSearch] = useState("");
@@ -21,16 +26,49 @@ export default function ProductsPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editProduct, setEditProduct] = useState<Product | null>(null);
 
-    const filtered = PRODUCTS.filter((p) => {
+    const handleFormSuccess = () => {
+        setShowAddModal(false);
+        setEditProduct(null);
+        loadProducts(); // Refresh list after add/edit
+    };
+
+    const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const loadProducts = async () => {
+        setIsLoading(true);
+        try {
+            const data = await productsApi.getAll();
+            setProducts(data || []);
+        } catch (err) {
+            console.error("Failed to load products", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadProducts();
+    }, []);
+
+    const filtered = products.filter((p) => {
         const matchCat = category === "all" || p.category === category;
         const q = search.toLowerCase();
         const matchSearch =
             !q ||
             p.name.toLowerCase().includes(q) ||
             p.sku.toLowerCase().includes(q) ||
-            p.barcode.includes(q);
+            p.barcode?.includes(q);
         return matchCat && matchSearch;
     });
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 space-y-5 animate-fade-in">
@@ -58,22 +96,22 @@ export default function ProductsPage() {
                     ))}
                 </select>
 
-                <button
-                    onClick={() => setShowAddModal(true)}
+                <Link
+                    href="/products/add"
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
                 >
                     <Plus className="w-4 h-4" />
                     Add Product
-                </button>
+                </Link>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                    { label: "Total Products", value: PRODUCTS.length, icon: Package, color: "text-blue-400" },
-                    { label: "Active", value: PRODUCTS.filter(p => p.isActive).length, icon: CheckCircle, color: "text-emerald-400" },
-                    { label: "Low Stock", value: PRODUCTS.filter(p => p.stock > 0 && p.stock <= p.minStock).length, icon: AlertCircle, color: "text-amber-400" },
-                    { label: "Out of Stock", value: PRODUCTS.filter(p => p.stock === 0).length, icon: X, color: "text-red-400" },
+                    { label: "Total Products", value: products.length, icon: Package, color: "text-blue-400" },
+                    { label: "Active", value: products.filter(p => p.isActive).length, icon: CheckCircle, color: "text-emerald-400" },
+                    { label: "Low Stock", value: products.filter(p => p.stock > 0 && p.stock <= p.minStock).length, icon: AlertCircle, color: "text-amber-400" },
+                    { label: "Out of Stock", value: products.filter(p => p.stock === 0).length, icon: X, color: "text-red-400" },
                 ].map((s) => {
                     const Icon = s.icon;
                     return (
@@ -226,7 +264,19 @@ export default function ProductsPage() {
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
-                                                <button className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                                                <button
+                                                    onClick={async () => {
+                                                        if (confirm(`Are you sure you want to delete ${product.name}?`)) {
+                                                            try {
+                                                                await productsApi.delete(product.id);
+                                                                loadProducts();
+                                                            } catch (err) {
+                                                                alert("Failed to delete product.");
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                                >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -245,7 +295,7 @@ export default function ProductsPage() {
                     </div>
                 )}
                 <div className="px-4 py-3 border-t border-border text-xs text-muted-foreground">
-                    Showing {filtered.length} of {PRODUCTS.length} products
+                    Showing {filtered.length} of {products.length} products
                 </div>
             </div>
 
@@ -254,149 +304,215 @@ export default function ProductsPage() {
                 <ProductFormModal
                     product={editProduct}
                     onClose={() => { setShowAddModal(false); setEditProduct(null); }}
+                    onSuccess={handleFormSuccess}
                 />
             )}
         </div>
     );
 }
 
-function ProductFormModal({ product, onClose }: { product: Product | null; onClose: () => void }) {
+function ProductFormModal({ product, onClose, onSuccess }: { product: Product | null; onClose: () => void; onSuccess: () => void }) {
     const isEdit = !!product;
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        const form = e.currentTarget;
+        const formData = new FormData(form);
+
+        const payload: Partial<Product> = {
+            name: formData.get("name") as string,
+            sku: formData.get("sku") as string,
+            barcode: formData.get("barcode") as string || undefined,
+            category: (formData.get("category") as string) as ProductCategory,
+            unit: formData.get("unit") as string,
+            price: parseFloat(formData.get("price") as string) || 0,
+            cost: parseFloat(formData.get("cost") as string) || 0,
+            stock: parseInt(formData.get("stock") as string) || 0,
+            minStock: parseInt(formData.get("minStock") as string) || 0,
+            description: formData.get("description") as string,
+            isActive: form.isActive.checked,
+            taxable: form.taxable.checked,
+            image: "📦", // Placeholder for now
+        };
+
+        try {
+            if (isEdit && product?.id) {
+                await productsApi.update(product.id, payload);
+            } else {
+                await productsApi.create(payload);
+            }
+            onSuccess();
+        } catch (error) {
+            console.error("Failed to save product", error);
+            alert("Failed to save product.");
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in overflow-y-auto max-h-[90vh]">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card">
-                    <h2 className="text-lg font-bold text-foreground">
-                        {isEdit ? "Edit Product" : "Add New Product"}
-                    </h2>
-                    <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
+                        <h2 className="text-lg font-bold text-foreground">
+                            {isEdit ? "Edit Product" : "Add New Product"}
+                        </h2>
+                        <button type="button" onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
 
-                <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Product Name *</label>
-                            <input
-                                defaultValue={product?.name}
-                                placeholder="e.g. Caramel Macchiato"
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
-                            />
+                    <div className="p-6 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="col-span-2">
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Product Name *</label>
+                                <input
+                                    name="name"
+                                    required
+                                    defaultValue={product?.name}
+                                    placeholder="e.g. Caramel Macchiato"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">SKU *</label>
+                                <input
+                                    name="sku"
+                                    required
+                                    defaultValue={product?.sku}
+                                    placeholder="BEV-001"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Barcode</label>
+                                <input
+                                    name="barcode"
+                                    defaultValue={product?.barcode}
+                                    placeholder="8901234567890"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Category *</label>
+                                <select
+                                    name="category"
+                                    required
+                                    defaultValue={product?.category}
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                                >
+                                    {CATEGORIES.filter(c => c.id !== "all").map((c) => (
+                                        <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Unit</label>
+                                <input
+                                    name="unit"
+                                    defaultValue={product?.unit ?? "piece"}
+                                    placeholder="piece, kg, liter..."
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Selling Price *</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                                    <input
+                                        name="price"
+                                        type="number"
+                                        required
+                                        min="0"
+                                        step="0.01"
+                                        defaultValue={product?.price}
+                                        placeholder="0.00"
+                                        className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Cost Price</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                                    <input
+                                        name="cost"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        defaultValue={product?.cost}
+                                        placeholder="0.00"
+                                        className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Current Stock</label>
+                                <input
+                                    name="stock"
+                                    type="number"
+                                    min="0"
+                                    defaultValue={product?.stock}
+                                    placeholder="0"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Min Stock Alert</label>
+                                <input
+                                    name="minStock"
+                                    type="number"
+                                    min="0"
+                                    defaultValue={product?.minStock}
+                                    placeholder="5"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+                                />
+                            </div>
+                            <div className="col-span-2">
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Description</label>
+                                <textarea
+                                    name="description"
+                                    defaultValue={product?.description}
+                                    placeholder="Product description..."
+                                    rows={2}
+                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-none"
+                                />
+                            </div>
+                            <div className="col-span-2 flex gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input name="isActive" type="checkbox" defaultChecked={product?.isActive ?? true} className="w-4 h-4 rounded accent-primary" />
+                                    <span className="text-sm text-foreground">Active</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input name="taxable" type="checkbox" defaultChecked={product?.taxable ?? true} className="w-4 h-4 rounded accent-primary" />
+                                    <span className="text-sm text-foreground">Taxable</span>
+                                </label>
+                            </div>
                         </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">SKU *</label>
-                            <input
-                                defaultValue={product?.sku}
-                                placeholder="BEV-001"
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary font-mono"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Barcode</label>
-                            <input
-                                defaultValue={product?.barcode}
-                                placeholder="8901234567890"
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary font-mono"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Category *</label>
-                            <select
-                                defaultValue={product?.category}
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+
+                        <div className="flex gap-3 pt-4 border-t border-border mt-4">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={isLoading}
+                                className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
                             >
-                                {CATEGORIES.filter(c => c.id !== "all").map((c) => (
-                                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Unit</label>
-                            <input
-                                defaultValue={product?.unit ?? "piece"}
-                                placeholder="piece, kg, liter..."
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Selling Price *</label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                                <input
-                                    type="number"
-                                    defaultValue={product?.price}
-                                    placeholder="0.00"
-                                    className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Cost Price</label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                                <input
-                                    type="number"
-                                    defaultValue={product?.cost}
-                                    placeholder="0.00"
-                                    className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Current Stock</label>
-                            <input
-                                type="number"
-                                defaultValue={product?.stock}
-                                placeholder="0"
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Min Stock Alert</label>
-                            <input
-                                type="number"
-                                defaultValue={product?.minStock}
-                                placeholder="5"
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
-                            />
-                        </div>
-                        <div className="col-span-2">
-                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Description</label>
-                            <textarea
-                                defaultValue={product?.description}
-                                placeholder="Product description..."
-                                rows={2}
-                                className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-none"
-                            />
-                        </div>
-                        <div className="col-span-2 flex gap-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" defaultChecked={product?.isActive ?? true} className="w-4 h-4 rounded accent-primary" />
-                                <span className="text-sm text-foreground">Active</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" defaultChecked={product?.taxable ?? true} className="w-4 h-4 rounded accent-primary" />
-                                <span className="text-sm text-foreground">Taxable</span>
-                            </label>
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="flex-1 py-2.5 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                            >
+                                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {isEdit ? "Save Changes" : "Add Product"}
+                            </button>
                         </div>
                     </div>
-
-                    <div className="flex gap-3 pt-2">
-                        <button
-                            onClick={onClose}
-                            className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-                        >
-                            {isEdit ? "Save Changes" : "Add Product"}
-                        </button>
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
     );

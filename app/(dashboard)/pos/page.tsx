@@ -6,9 +6,10 @@ import { CartSidebar } from "@/components/pos/cart-sidebar";
 import { PaymentModal } from "@/components/pos/payment-modal";
 import { CATEGORIES } from "@/lib/data";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Barcode, Search, ShoppingCart, X } from "lucide-react";
+import { Barcode, Search, ShoppingCart, X, Coffee } from "lucide-react";
 import type { ProductCategory } from "@/lib/types";
 import { useCartStore } from "@/store/cart-store";
+import { settingsApi } from "@/lib/api/apis";
 
 export default function POSPage() {
     const [search, setSearch] = useState("");
@@ -16,11 +17,28 @@ export default function POSPage() {
     const [showPayment, setShowPayment] = useState(false);
     const [barcodeMode, setBarcodeMode] = useState(false);
     const [showMobileCart, setShowMobileCart] = useState(false);
+    const [mounted, setMounted] = useState(false);
+    const [settings, setSettings] = useState<any>(null);
+    const [isTeaMode, setIsTeaMode] = useState(false);
+    
     const searchRef = useRef<HTMLInputElement>(null);
-    const { getItemCount, getTotal } = useCartStore();
+    const { getItemCount, getTotal, addItem } = useCartStore();
 
-    const itemCount = getItemCount();
-    const total = getTotal();
+    const itemCount = mounted ? getItemCount() : 0;
+    const total = mounted ? getTotal() : 0;
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const data = await settingsApi.get();
+                setSettings(data);
+            } catch (error) {
+                console.error("Failed to fetch settings:", error);
+            }
+        };
+        fetchSettings();
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         const handleKey = (e: KeyboardEvent) => {
@@ -83,7 +101,67 @@ export default function POSPage() {
                             <Barcode className="w-4 h-4" />
                             <span className="hidden sm:inline text-xs">F2</span>
                         </button>
+
+                        {settings?.store?.parlour && (
+                            <button
+                                onClick={() => setIsTeaMode((p) => !p)}
+                                className={cn(
+                                    "px-2.5 md:px-3 py-2 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center gap-1.5 flex-shrink-0",
+                                    isTeaMode
+                                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                                        : "border-border text-muted-foreground hover:text-foreground"
+                                )}
+                                title="Tea Mode"
+                            >
+                                <Coffee className="w-4 h-4" />
+                                <span className="hidden sm:inline text-xs">Tea</span>
+                            </button>
+                        )}
                     </div>
+
+                    {isTeaMode && (
+                        <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl flex items-center justify-between animate-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                                    <Coffee className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-foreground">Tea Service Active</h4>
+                                    <p className="text-[10px] text-muted-foreground">Add quick tea to order</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => addItem({
+                                        id: "tea-half",
+                                        name: "Tea (Half)",
+                                        price: settings?.store?.tea_half_price || 10,
+                                        category: "beverages",
+                                        image: "☕",
+                                        stock: 999,
+                                        unit: "cup"
+                                    } as any)}
+                                    className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-500 hover:text-white transition-all whitespace-nowrap"
+                                >
+                                    + Half (₹{settings?.store?.tea_half_price || 10})
+                                </button>
+                                <button 
+                                    onClick={() => addItem({
+                                        id: "tea-full",
+                                        name: "Tea (Full)",
+                                        price: settings?.store?.tea_full_price || 15,
+                                        category: "beverages",
+                                        image: "☕",
+                                        stock: 999,
+                                        unit: "cup"
+                                    } as any)}
+                                    className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-colors whitespace-nowrap"
+                                >
+                                    + Full (₹{settings?.store?.tea_full_price || 15})
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Category Filters */}
                     <div className="flex gap-1.5 md:gap-2 overflow-x-auto pb-0.5 scrollbar-none">

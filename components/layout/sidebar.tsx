@@ -16,17 +16,21 @@ import {
     Warehouse,
     X,
     Zap,
+    Wallet
 } from "lucide-react";
+import { settingsApi } from "@/lib/api/apis";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui-store";
+import { useEffect, useState } from "react";
 
-const navItems = [
+const ALL_NAV_ITEMS = [
     { label: "Dashboard", href: "/dashboard", icon: Home },
     { label: "POS / Sales", href: "/pos", icon: ShoppingCart, badge: "HOT" },
     { label: "Products", href: "/products", icon: Package },
     { label: "Inventory", href: "/inventory", icon: Warehouse },
     { label: "Orders", href: "/orders", icon: ClipboardList },
     { label: "Customers", href: "/customers", icon: Users },
+    { label: "Credit Management", href: "/credits", icon: Wallet, feature: "credit_system" },
     { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "Staff", href: "/staff", icon: UserSquare2 },
     { label: "Settings", href: "/settings", icon: Cog },
@@ -40,9 +44,35 @@ interface SidebarProps {
 export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
     const pathname = usePathname();
     const { sidebarCollapsed, toggleSidebar } = useUIStore();
+    const [user, setUser] = useState<{name: string, role: string} | null>(null);
+    const [mounted, setMounted] = useState(false);
+    const [settings, setSettings] = useState<any>(null);
+
+    useEffect(() => {
+        setMounted(true);
+        const fetchData = async () => {
+            if (typeof window !== "undefined") {
+                const storedUser = localStorage.getItem("user");
+                if (storedUser) {
+                    try {
+                        setUser(JSON.parse(storedUser));
+                    } catch (e) {
+                        console.error("Failed to parse user from localStorage", e);
+                    }
+                }
+            }
+            try {
+                const s = await settingsApi.get();
+                setSettings(s);
+            } catch (e) {
+                console.error("Failed to fetch settings for sidebar", e);
+            }
+        };
+        fetchData();
+    }, []);
 
     const isMobile = !!onClose;
-    const isCollapsed = !isMobile && sidebarCollapsed;
+    const isCollapsed = !isMobile && mounted && sidebarCollapsed;
 
     const SidebarContent = () => (
         <aside
@@ -75,7 +105,11 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
 
             {/* Navigation */}
             <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-                {navItems.map((item) => {
+                {ALL_NAV_ITEMS.filter(item => {
+                    if (!item.feature) return true;
+                    if (item.feature === "credit_system") return settings?.payment?.credit_system;
+                    return true;
+                }).map((item) => {
                     const Icon = item.icon;
                     const isActive =
                         pathname === item.href ||
@@ -125,12 +159,16 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
             <div className="p-3 border-t border-border/30 flex-shrink-0">
                 {!isCollapsed && (
                     <div className="flex items-center gap-2 px-2 mb-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                            AT
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary uppercase">
+                            {user?.name ? user.name.substring(0, 2) : "U"}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-white truncate">Alex Turner</p>
-                            <p className="text-xs text-white/40 truncate">Admin</p>
+                            <p className="text-xs font-medium text-white truncate">
+                                {user?.name || "Guest User"}
+                            </p>
+                            <p className="text-xs text-white/40 truncate capitalize">
+                                {user?.role || "User"}
+                            </p>
                         </div>
                         <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                     </div>

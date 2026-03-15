@@ -14,7 +14,9 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { cn, formatCurrency } from "@/lib/utils";
-import { CUSTOMERS } from "@/lib/data";
+import { customersApi } from "@/lib/api/apis";
+import { useEffect } from "react";
+import type { Customer } from "@/lib/types";
 
 interface CartSidebarProps {
     onPayment: () => void;
@@ -51,13 +53,21 @@ export function CartSidebar({ onPayment, mobile }: CartSidebarProps) {
     const [discountTypeInput, setDiscountTypeInput] = useState<"percentage" | "fixed">(globalDiscountType);
     const [customerSearch, setCustomerSearch] = useState("");
 
+    const [customers, setCustomers] = useState<Customer[]>([]);
+
+    useEffect(() => {
+        customersApi.getAll()
+            .then(data => setCustomers(data || []))
+            .catch(err => console.error("Failed to fetch customers", err));
+    }, []);
+
     const subtotal = getSubtotal();
     const discount = getDiscount();
     const tax = getTax();
     const total = getTotal();
     const itemCount = getItemCount();
 
-    const filteredCustomers = CUSTOMERS.filter(
+    const filteredCustomers = customers.filter(
         (c) =>
             !customerSearch ||
             c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
