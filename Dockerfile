@@ -1,62 +1,39 @@
-# Use official Node.js as base
-FROM node:20-alpine AS base
+# 1. Use a simple, lightweight Node.js image
+FROM node:20-alpine
 
-# Install dependencies only when needed
-FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
-
+# 2. Set the working directory inside the container
 WORKDIR /app
 
-# Enable pnpm
+# 3. Enable pnpm
 RUN corepack enable pnpm
 
-# Copy package descriptors
+# 4. Copy package.json and lockfile
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
-RUN pnpm install --frozen-lockfile
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# 5. Install dependencies carefully (concurrency 1 saves network and RAM)
+RUN pnpm install --frozen-lockfile --network-concurrency 1
+
+# 6. Copy the rest of the application files
 COPY . .
 
-# Enable pnpm
-RUN corepack enable pnpm
-
-# Set environment variables for build
+# 7. EXTREMELY IMPORTANT FOR 1GB RAM:
+#    - Disable telemetry
+#    - Restrict Node.js memory to 512MB
+#    - Limit Webpack/Turbopack workers so it doesn't spawn child processes that eat RAM
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max_old_space_size=512"
+ENV NEXT_WEBPACK_USE_WORKERS=0
 
-# Run the build process
+# 8. Run the production build
 RUN pnpm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
-
+# 9. Set startup environment variables
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Set the correct permissions for the .next cache directory
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Switch to non-root user
-USER nextjs
-
-EXPOSE 3000
-
 ENV PORT=3000
-# set hostname to localhost
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+# 10. Expose the port your app runs on
+EXPOSE 3000
+
+# 11. Run the standard Next.js start command
+CMD ["pnpm", "start"]
