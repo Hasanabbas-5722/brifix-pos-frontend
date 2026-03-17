@@ -163,3 +163,13 @@ export const settingsApi = {
         return fetchApi<{ status: string, message: string }>("/settings/", { method: "POST", body: data });
     }
 };
+
+// =======================
+// SYSTEM API
+// =======================
+export const systemApi = {
+    getHealth: async () => {
+        const res = await fetchApi<any>("/health", { method: "GET", requireAuth: false });
+        return res;
+    }
+};
