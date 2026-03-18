@@ -30,7 +30,7 @@ export function ProductGrid({ search, category }: ProductGridProps) {
             const matchesSearch =
                 !q ||
                 p.name.toLowerCase().includes(q) ||
-                p.sku.toLowerCase().includes(q) ||
+
                 p.barcode?.includes(q) ||
                 p.description?.toLowerCase().includes(q);
             return matchesCategory && matchesSearch;

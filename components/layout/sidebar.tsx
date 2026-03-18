@@ -16,12 +16,15 @@ import {
     Warehouse,
     X,
     Zap,
-    Wallet
+    Wallet,
+    LogOut
 } from "lucide-react";
 import { settingsApi } from "@/lib/api/apis";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui-store";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCartStore } from "@/store/cart-store";
 
 const ALL_NAV_ITEMS = [
     { label: "Dashboard", href: "/dashboard", icon: Home },
@@ -43,6 +46,7 @@ interface SidebarProps {
 
 export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { sidebarCollapsed, toggleSidebar } = useUIStore();
     const [user, setUser] = useState<{name: string, role: string} | null>(null);
     const [mounted, setMounted] = useState(false);
@@ -70,6 +74,21 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
         };
         fetchData();
     }, []);
+
+    const handleLogout = () => {
+        if (typeof window !== "undefined") {
+            // Clear all auth boundaries and persistent generic stores
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("refreshToken");
+            localStorage.removeItem("user");
+            localStorage.removeItem("pos-cart");
+            
+            // Hydrate out Zustand runtime immediately
+            useCartStore.getState().clearCart();
+            
+            router.push("/login");
+        }
+    };
 
     const isMobile = !!onClose;
     const isCollapsed = !isMobile && mounted && sidebarCollapsed;
@@ -162,7 +181,7 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
                         <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary uppercase">
                             {user?.name ? user.name.substring(0, 2) : "U"}
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 pr-2 border-r border-white/10">
                             <p className="text-xs font-medium text-white truncate">
                                 {user?.name || "Guest User"}
                             </p>
@@ -170,7 +189,13 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
                                 {user?.role || "User"}
                             </p>
                         </div>
-                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                        <button 
+                            onClick={handleLogout}
+                            className="p-1.5 rounded-lg text-red-400/70 hover:text-red-400 hover:bg-red-400/10 transition-colors ml-1"
+                            title="Log Out"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </button>
                     </div>
                 )}
                 {/* Collapse toggle — desktop only */}

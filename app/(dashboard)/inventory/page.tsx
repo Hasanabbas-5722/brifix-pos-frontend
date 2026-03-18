@@ -13,7 +13,6 @@ import Link from "next/link";
 interface InventoryItem {
     id: string;
     name: string;
-    sku: string;
     stock: number;
     minStock: number;
     unit: string;
@@ -59,7 +58,7 @@ export default function InventoryPage() {
 
     const filtered = inventory.filter((p) => {
         const q = search.toLowerCase();
-        const matchSearch = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
+        const matchSearch = !q || p.name.toLowerCase().includes(q);
         if (filterStock === "out") return matchSearch && p.stock === 0;
         if (filterStock === "low") return matchSearch && p.stock > 0 && p.stock <= p.minStock;
         if (filterStock === "ok") return matchSearch && p.stock > p.minStock;
@@ -139,10 +138,15 @@ export default function InventoryPage() {
                             return (
                                 <div key={product.id} className={cn("bg-card border rounded-xl p-4", isOut ? "border-red-500/20 bg-red-500/3" : isLow ? "border-amber-500/20 bg-amber-500/3" : "border-border")}>
                                     <div className="flex items-center gap-3 mb-3">
-                                        <span className="text-2xl">{product.image}</span>
+                                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-2xl flex-shrink-0">
+                                            {product.image?.startsWith('http') ? (
+                                                <img src={product.image} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                                            ) : (
+                                                <span className="text-2xl">{product.image || "📦"}</span>
+                                            )}
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium text-foreground text-sm">{product.name}</p>
-                                            <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
                                         </div>
                                         {isOut ? (
                                             <span className="text-xs px-2 py-1 rounded-full bg-red-400/10 text-red-400 font-medium flex-shrink-0">Out</span>
@@ -177,7 +181,7 @@ export default function InventoryPage() {
                             <table className="w-full">
                                 <thead className="bg-muted/30 border-b border-border">
                                     <tr>
-                                        {["Product", "SKU", "Category", "Current Stock", "Min Stock", "Status", "Action"].map((h) => (
+                                        {["Product", "Category", "Current Stock", "Min Stock", "Status", "Action"].map((h) => (
                                             <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                                         ))}
                                     </tr>
@@ -191,11 +195,16 @@ export default function InventoryPage() {
                                             <tr key={product.id} className={cn("hover:bg-muted/20 transition-colors", isOut && "bg-red-500/3", isLow && "bg-amber-500/3")}>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-3">
-                                                        <span className="text-xl">{product.image}</span>
+                                                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-xl flex-shrink-0">
+                                                            {product.image?.startsWith('http') ? (
+                                                                <img src={product.image} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                                                            ) : (
+                                                                <span className="text-xl">{product.image || "📦"}</span>
+                                                            )}
+                                                        </div>
                                                         <p className="text-sm font-medium text-foreground">{product.name}</p>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3"><p className="text-xs font-mono text-muted-foreground">{product.sku}</p></td>
                                                 <td className="px-4 py-3"><span className="text-xs text-muted-foreground capitalize">{product.category}</span></td>
                                                 <td className="px-4 py-3">
                                                     <div className="space-y-1">

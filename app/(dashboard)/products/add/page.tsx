@@ -20,12 +20,22 @@ import {
 import { CATEGORIES, CATEGORY_COLORS } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import type { Product, ProductCategory } from "@/lib/types";
-import { productsApi } from "@/lib/api/apis";
+import { productsApi, uploadApi } from "@/lib/api/apis";
 
 export default function AddProductPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -34,9 +44,28 @@ export default function AddProductPage() {
         const form = e.currentTarget;
         const formData = new FormData(form);
 
+        let finalImageUrl = "";
+
+        if (imageFile) {
+            const formDataUpload = new FormData();
+            formDataUpload.append("file", imageFile);
+            formDataUpload.append("folder", "products");
+
+            try {
+                console.log("Uploading image...", formDataUpload);
+                const uploadRes = await uploadApi.uploadImage(formDataUpload);
+                console.log("Image uploaded successfully", uploadRes);
+                if (uploadRes?.url) {
+                    finalImageUrl = uploadRes.url;
+                }
+            } catch (uploadErr) {
+                console.error("Image upload failed", uploadErr);
+                alert("Image upload failed. Proceeding without new image.");
+            }
+        }
+
         const payload: Partial<Product> = {
             name: formData.get("name") as string,
-            sku: formData.get("sku") as string,
             barcode: (formData.get("barcode") as string) || undefined,
             category: (formData.get("category") as string) as ProductCategory,
             unit: formData.get("unit") as string,
@@ -47,7 +76,7 @@ export default function AddProductPage() {
             description: formData.get("description") as string,
             isActive: (form.elements.namedItem("isActive") as HTMLInputElement).checked,
             taxable: (form.elements.namedItem("taxable") as HTMLInputElement).checked,
-            image: "📦", // Default emoji
+            image: finalImageUrl,
         };
 
         try {
@@ -125,29 +154,15 @@ export default function AddProductPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-muted-foreground">SKU (Stock Keeping Unit) *</label>
-                                    <div className="relative group">
-                                        <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                        <input
-                                            name="sku"
-                                            required
-                                            placeholder="PROD-001"
-                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-background text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-mono"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-muted-foreground">Barcode / EAN</label>
-                                    <div className="relative group">
-                                        <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                        <input
-                                            name="barcode"
-                                            placeholder="890123456789"
-                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-background text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-mono"
-                                        />
-                                    </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground">Barcode / EAN</label>
+                                <div className="relative group">
+                                    <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                    <input
+                                        name="barcode"
+                                        placeholder="890123456789"
+                                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-background text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                                    />
                                 </div>
                             </div>
 
@@ -251,6 +266,31 @@ export default function AddProductPage() {
                 {/* Sidebar Info */}
                 <div className="space-y-6">
                     <div className="bg-card border border-border rounded-2xl overflow-hidden p-6 space-y-6">
+                        <div className="space-y-4">
+                            <label className="text-sm font-medium text-muted-foreground block">Profile Picture / Image</label>
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="w-full aspect-square max-h-[220px] rounded-2xl border-2 border-dashed border-border overflow-hidden bg-muted/20 flex flex-col items-center justify-center relative cursor-pointer hover:bg-muted/40 transition-colors group">
+                                    {imagePreview ? (
+                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <>
+                                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-3">
+                                                <ImageIcon className="w-6 h-6" />
+                                            </div>
+                                            <p className="text-sm font-medium text-foreground">Click to upload photo</p>
+                                            <p className="text-xs text-muted-foreground mt-1 text-center px-4">JPEG, PNG, WEBP up to 5MB</p>
+                                        </>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground">Category *</label>
                             <select

@@ -11,7 +11,6 @@ export type ProductCategory =
 export interface Product {
     id: string;
     name: string;
-    sku: string;
     barcode: string;
     category: ProductCategory;
     price: number;
@@ -92,7 +91,7 @@ export interface Supplier {
 
 export interface InventoryAdjustment {
     id: string;
-    product: Pick<Product, "id" | "name" | "sku">;
+    product: Pick<Product, "id" | "name">;
     type: "add" | "remove" | "adjustment";
     quantity: number;
     reason: string;

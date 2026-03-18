@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://13.127.115.121:5000/api";
+const API_BASE_URL = "http://localhost:5000/api";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -14,10 +14,15 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
     const performRequest = async (tokenOverride?: string) => {
         const requestHeaders: Record<string, string> = {
-            "Content-Type": "application/json",
             ...headers,
         };
 
+        if (!(typeof FormData !== "undefined" && body instanceof FormData)) {
+            if (!requestHeaders["Content-Type"]) {
+                requestHeaders["Content-Type"] = "application/json";
+            }
+        }
+        console.log("requestHeaders", requestHeaders);
         if (requireAuth) {
             if (typeof window !== "undefined") {
                 const token = tokenOverride || localStorage.getItem("accessToken");
@@ -31,11 +36,15 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             method,
             headers: requestHeaders,
         };
-
+        console.log("bodyb ", body);
         if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
-            config.body = JSON.stringify(body);
+            if (typeof FormData !== "undefined" && body instanceof FormData) {
+                config.body = body;
+            } else {
+                config.body = JSON.stringify(body);
+            }
         }
-
+        console.log("config", config);
         return fetch(`${API_BASE_URL}${endpoint}`, config);
     };
 
@@ -95,6 +104,7 @@ function handleLogout() {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
+        localStorage.removeItem("pos-cart");
         window.location.href = "/login";
     }
 }

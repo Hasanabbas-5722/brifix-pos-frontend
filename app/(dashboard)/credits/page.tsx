@@ -338,10 +338,10 @@ export default function CreditsPage() {
                                 {selectedBill.items?.map((item: any, idx: number) => (
                                     <div key={idx} className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 border border-border">
                                         <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center border border-border">
-                                            {item.product?.image ? (
+                                            {item.product?.image?.startsWith('http') ? (
                                                 <img src={item.product.image} alt="" className="w-full h-full object-cover rounded-lg" />
                                             ) : (
-                                                <Package className="w-5 h-5 text-muted-foreground" />
+                                                <span className="text-2xl">{item.product?.image || "📦"}</span>
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">

@@ -178,7 +178,11 @@ export function CartSidebar({ onPayment, mobile }: CartSidebarProps) {
                                 className="flex gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors animate-fade-in"
                             >
                                 <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-xl flex-shrink-0">
-                                    {item.product.image}
+                                    {item.product.image?.startsWith('http') ? (
+                                        <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover rounded-lg" />
+                                    ) : (
+                                        item.product.image || "📦"
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-medium text-foreground truncate">

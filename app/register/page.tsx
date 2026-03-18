@@ -2,24 +2,27 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, Store, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, Mail, Store, ArrowRight, Loader2, User, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authApi } from "@/lib/api/apis";
 import Link from "next/link";
-import { useCartStore } from "@/store/cart-store";
 
-export default function LoginPage() {
+export default function RegisterPage() {
     const router = useRouter();
+    const [name, setName] = useState("");
+    const [companyName, setCompanyName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+        setSuccess("");
 
-        if (!email || !password) {
+        if (!name || !companyName || !email || !password) {
             setError("Please fill in all fields");
             return;
         }
@@ -27,20 +30,15 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            const response = await authApi.login({ email, password });
+            const response = await authApi.register({ name, companyName, email, password });
 
-            if (response.status === "success" && response.data.access_token) {
-                // Save token to localStorage to be attached to future requests
-                localStorage.setItem("accessToken", response.data.access_token);
-                localStorage.setItem("refreshToken", response.data.refresh_token);
-                localStorage.setItem("user", JSON.stringify(response.data.user));
-
-                // Clear any residual generic cart data to prevent cross-account/tenant cart bleeding
-                useCartStore.getState().clearCart();
-
-                router.push("/dashboard");
+            if (response.status === "success") {
+                setSuccess("Registration successful! Redirecting to login...");
+                setTimeout(() => {
+                    router.push("/login");
+                }, 2000);
             } else {
-                setError(response.message || "Invalid credentials");
+                setError(response.message || "Registration failed");
             }
         } catch (err: any) {
             setError(err.message || "Failed to connect to the server. Please try again.");
@@ -49,24 +47,19 @@ export default function LoginPage() {
         }
     };
 
-    const handleDemoLogin = () => {
-        setEmail("admin@brifix.com");
-        setPassword("admin123");
-    };
-
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden py-12">
             {/* dynamic background blobs */}
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[128px] pointer-events-none mix-blend-screen" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-[128px] pointer-events-none mix-blend-screen" />
+            <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[128px] pointer-events-none mix-blend-screen" />
+            <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-[128px] pointer-events-none mix-blend-screen" />
 
             <div className="z-10 w-full max-w-md px-4">
                 <div className="text-center mb-8 animate-fade-in" style={{ animationDelay: "100ms" }}>
                     <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4 shadow-xl shadow-primary/20 ring-1 ring-primary/20">
                         <Store className="w-8 h-8 text-primary" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome to BriFix</h1>
-                    <p className="text-muted-foreground mt-2">Sign in to your point of sale system</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Create an Account</h1>
+                    <p className="text-muted-foreground mt-2">Register your company to get started</p>
                 </div>
 
                 <div
@@ -76,15 +69,50 @@ export default function LoginPage() {
                     {/* Decorative subtle top border */}
                     <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-50" />
 
-                    <form onSubmit={handleLogin} className="space-y-5">
+                    <form onSubmit={handleRegister} className="space-y-4">
                         {error && (
                             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium text-center animate-shake">
                                 {error}
                             </div>
                         )}
+                        {success && (
+                            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm font-medium text-center">
+                                {success}
+                            </div>
+                        )}
 
                         <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-foreground ml-1">Email or Username</label>
+                            <label className="text-sm font-medium text-foreground ml-1">Full Name</label>
+                            <div className="relative group">
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="John Doe"
+                                    className="w-full pl-11 pr-4 py-3 bg-muted/30 border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-foreground ml-1">Company / Store Name</label>
+                            <div className="relative group">
+                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    value={companyName}
+                                    onChange={(e) => setCompanyName(e.target.value)}
+                                    placeholder="My Awesome Store"
+                                    className="w-full pl-11 pr-4 py-3 bg-muted/30 border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-foreground ml-1">Email Address</label>
                             <div className="relative group">
                                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                 <input
@@ -99,19 +127,17 @@ export default function LoginPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <div className="flex items-center justify-between ml-1">
-                                <label className="text-sm font-medium text-foreground">Password</label>
-                                <a href="#" className="text-xs text-primary hover:underline font-medium">Forgot password?</a>
-                            </div>
+                            <label className="text-sm font-medium text-foreground ml-1">Password</label>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter your password"
+                                    placeholder="Create a secure password"
                                     className="w-full pl-11 pr-4 py-3 bg-muted/30 border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
                                     required
+                                    minLength={6}
                                 />
                             </div>
                         </div>
@@ -119,13 +145,13 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full relative group overflow-hidden rounded-xl bg-primary text-primary-foreground font-bold text-sm py-3.5 transition-all duration-300 hover:shadow-[0_0_20px_rgba(var(--primary),0.4)] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:shadow-none"
+                            className="w-full relative group overflow-hidden rounded-xl bg-primary text-primary-foreground font-bold text-sm py-3.5 transition-all duration-300 hover:shadow-[0_0_20px_rgba(var(--primary),0.4)] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:shadow-none mt-2"
                         >
                             <span className={cn(
                                 "flex items-center justify-center gap-2 transition-all duration-200",
                                 isLoading ? "opacity-0 translate-y-2" : "opacity-100 translate-y-0"
                             )}>
-                                Sign In
+                                Register Account
                                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </span>
                             {isLoading && (
@@ -138,31 +164,21 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="mt-8 relative hidden sm:block">
+                    <div className="mt-8 relative">
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-border" />
                         </div>
                         <div className="relative flex justify-center text-xs">
-                            <span className="bg-card px-2 text-muted-foreground">Or try the demo</span>
+                            <span className="bg-card px-2 text-muted-foreground">Already have an account?</span>
                         </div>
-                    </div>
-
-                    <div className="mt-6 flex flex-col sm:flex-row gap-2">
-                        <button
-                            type="button"
-                            onClick={handleDemoLogin}
-                            className="hidden sm:block w-full py-2.5 rounded-xl border border-border/60 bg-muted/10 text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all duration-200"
-                        >
-                            Fill Demo Credentials
-                        </button>
                     </div>
 
                     <div className="mt-6 flex justify-center">
                         <Link
-                            href="/register"
-                            className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                            href="/login"
+                            className="w-full text-center py-2.5 rounded-xl border border-border/60 bg-muted/10 text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all duration-200"
                         >
-                            Don't have an account? <span className="text-primary hover:underline">Register your company</span>
+                            Back to Sign In
                         </Link>
                     </div>
                 </div>

@@ -16,7 +16,7 @@ import Link from "next/link";
 import { CATEGORIES, CATEGORY_COLORS } from "@/lib/data";
 import { formatCurrency, cn } from "@/lib/utils";
 import type { Product, ProductCategory } from "@/lib/types";
-import { productsApi } from "@/lib/api/apis";
+import { uploadApi, productsApi } from "@/lib/api/apis";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -57,7 +57,6 @@ export default function ProductsPage() {
         const matchSearch =
             !q ||
             p.name.toLowerCase().includes(q) ||
-            p.sku.toLowerCase().includes(q) ||
             p.barcode?.includes(q);
         return matchCat && matchSearch;
     });
@@ -138,7 +137,11 @@ export default function ProductsPage() {
                                     className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl flex-shrink-0"
                                     style={{ background: `${CATEGORY_COLORS[product.category]}15` }}
                                 >
-                                    {product.image}
+                                    {product.image?.startsWith('http') ? (
+                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                                    ) : (
+                                        product.image || "📦"
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start gap-2">
@@ -146,7 +149,6 @@ export default function ProductsPage() {
                                         <p className="font-bold text-foreground">{formatCurrency(product.price)}</p>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
                                         <span
                                             className="text-[10px] px-1.5 py-0.5 rounded capitalize font-medium"
                                             style={{ background: `${CATEGORY_COLORS[product.category]}20`, color: CATEGORY_COLORS[product.category] }}
@@ -183,7 +185,7 @@ export default function ProductsPage() {
                     <table className="w-full">
                         <thead className="bg-muted/30 border-b border-border">
                             <tr>
-                                {["Product", "SKU", "Category", "Price", "Cost", "Stock", "Status", "Actions"].map((h) => (
+                                {["Product", "Category", "Price", "Cost", "Stock", "Status", "Actions"].map((h) => (
                                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                                         {h}
                                     </th>
@@ -202,7 +204,11 @@ export default function ProductsPage() {
                                                     className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0"
                                                     style={{ background: `${CATEGORY_COLORS[product.category]}15` }}
                                                 >
-                                                    {product.image}
+                                                    {product.image?.startsWith('http') ? (
+                                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                                                    ) : (
+                                                        product.image || "📦"
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-medium text-foreground">{product.name}</p>
@@ -211,7 +217,6 @@ export default function ProductsPage() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
                                             <p className="text-[10px] text-muted-foreground/60">{product.barcode}</p>
                                         </td>
                                         <td className="px-4 py-3">
@@ -314,6 +319,16 @@ export default function ProductsPage() {
 function ProductFormModal({ product, onClose, onSuccess }: { product: Product | null; onClose: () => void; onSuccess: () => void }) {
     const isEdit = !!product;
     const [isLoading, setIsLoading] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(product?.image?.startsWith('http') ? product.image : null);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -322,9 +337,26 @@ function ProductFormModal({ product, onClose, onSuccess }: { product: Product | 
         const form = e.currentTarget;
         const formData = new FormData(form);
 
+        let finalImageUrl = product?.image || "📦";
+            
+        if (imageFile) {
+            const formDataUpload = new FormData();
+            formDataUpload.append("file", imageFile);
+            formDataUpload.append("folder", "products");
+            
+            try {
+                const uploadRes = await uploadApi.uploadImage(formDataUpload);
+                if (uploadRes?.url) {
+                    finalImageUrl = uploadRes.url;
+                }
+            } catch (uploadErr) {
+                console.error("Image upload failed", uploadErr);
+                alert("Image upload failed. Proceeding without new image.");
+            }
+        }
+
         const payload: Partial<Product> = {
             name: formData.get("name") as string,
-            sku: formData.get("sku") as string,
             barcode: formData.get("barcode") as string || undefined,
             category: (formData.get("category") as string) as ProductCategory,
             unit: formData.get("unit") as string,
@@ -333,9 +365,9 @@ function ProductFormModal({ product, onClose, onSuccess }: { product: Product | 
             stock: parseInt(formData.get("stock") as string) || 0,
             minStock: parseInt(formData.get("minStock") as string) || 0,
             description: formData.get("description") as string,
-            isActive: form.isActive.checked,
-            taxable: form.taxable.checked,
-            image: "📦", // Placeholder for now
+            isActive: (form.elements.namedItem("isActive") as HTMLInputElement).checked,
+            taxable: (form.elements.namedItem("taxable") as HTMLInputElement).checked,
+            image: finalImageUrl,
         };
 
         try {
@@ -368,26 +400,6 @@ function ProductFormModal({ product, onClose, onSuccess }: { product: Product | 
                     <div className="p-6 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="col-span-2">
-                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Product Name *</label>
-                                <input
-                                    name="name"
-                                    required
-                                    defaultValue={product?.name}
-                                    placeholder="e.g. Caramel Macchiato"
-                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">SKU *</label>
-                                <input
-                                    name="sku"
-                                    required
-                                    defaultValue={product?.sku}
-                                    placeholder="BEV-001"
-                                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary font-mono"
-                                />
-                            </div>
-                            <div>
                                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Barcode</label>
                                 <input
                                     name="barcode"
@@ -480,6 +492,28 @@ function ProductFormModal({ product, onClose, onSuccess }: { product: Product | 
                                     rows={2}
                                     className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-none"
                                 />
+                            </div>
+                            <div className="col-span-2">
+                                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Profile Picture (Product Image)</label>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 rounded-xl border border-border overflow-hidden bg-muted flex flex-shrink-0 items-center justify-center">
+                                        {imagePreview ? (
+                                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            product && !product.image?.startsWith('http') ? (
+                                                <span className="text-2xl">{product.image || "📦"}</span>
+                                            ) : (
+                                                <Package className="w-6 h-6 text-muted-foreground" />
+                                            )
+                                        )}
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                                    />
+                                </div>
                             </div>
                             <div className="col-span-2 flex gap-4">
                                 <label className="flex items-center gap-2 cursor-pointer">

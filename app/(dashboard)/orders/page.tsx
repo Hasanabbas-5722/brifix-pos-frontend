@@ -381,7 +381,13 @@ function OrderDetailModal({ order, onClose, onRefund, onPrint }: { order: Order;
                         <div className="space-y-2">
                             {order.items.map((item, i) => (
                                 <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20">
-                                    <span className="text-2xl">{item.product.image}</span>
+                                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-2xl flex-shrink-0">
+                                        {item.product.image?.startsWith('http') ? (
+                                            <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover rounded-lg" />
+                                        ) : (
+                                            <span className="text-2xl">{item.product.image || "📦"}</span>
+                                        )}
+                                    </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium text-foreground">{item.product.name}</p>
                                         <p className="text-xs text-muted-foreground">{formatCurrency(item.product.price)} × {item.quantity}</p>

@@ -173,3 +173,14 @@ export const systemApi = {
         return res;
     }
 };
+
+// =======================
+// UPLOAD API
+// =======================
+export const uploadApi = {
+    uploadImage: async (formData: FormData) => {
+        const res = await fetchApi<{ status: string, data: { url: string }, message: string }>("/upload/image", { method: "POST", body: formData });
+        console.log("Image uploaded successfully", res);
+        return res.data;
+    }
+};

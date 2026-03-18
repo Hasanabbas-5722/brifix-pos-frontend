@@ -44,7 +44,11 @@ export function ProductCard({ product }: ProductCardProps) {
                     background: `linear-gradient(135deg, ${CATEGORY_COLORS[product.category]}15, ${CATEGORY_COLORS[product.category]}30)`,
                 }}
             >
-                {product.image}
+                {product.image?.startsWith('http') ? (
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                ) : (
+                    product.image || "📦"
+                )}
 
                 {/* Cart quantity badge */}
                 {cartItem && (
@@ -74,7 +78,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 <p className="text-xs font-semibold text-foreground leading-tight line-clamp-2 group-hover:text-primary transition-colors">
                     {product.name}
                 </p>
-                <p className="text-[10px] text-muted-foreground">{product.sku}</p>
+
 
                 <div className="flex items-center justify-between mt-auto pt-1">
                     <span className="text-sm font-bold text-foreground">

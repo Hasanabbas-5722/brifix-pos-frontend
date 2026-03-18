@@ -32,15 +32,6 @@ import { Loader2 } from "lucide-react";
 
 const PIE_COLORS = ["#8b5cf6", "#f59e0b", "#3b82f6", "#ec4899", "#10b981", "#ef4444"];
 
-const categoryData = [
-    { name: "Beverages", value: 35 },
-    { name: "Food", value: 28 },
-    { name: "Electronics", value: 18 },
-    { name: "Accessories", value: 10 },
-    { name: "Clothing", value: 6 },
-    { name: "Other", value: 3 },
-];
-
 export default function DashboardPage() {
     const [statsData, setStatsData] = useState<any>(null);
     const [products, setProducts] = useState<any[]>([]);
@@ -75,13 +66,14 @@ export default function DashboardPage() {
     const weekData = statsData?.sales_data || [];
     const monthlyRevenue = statsData?.monthly_revenue || [];
     const topProducts = statsData?.top_products || [];
+    const categoryData = statsData?.sales_by_category || [];
 
     const stats = [
         {
             title: "Today's Revenue",
             value: formatCurrency(statsData?.today_revenue || 0),
-            change: "+12.5%",
-            trend: "up",
+            change: statsData?.revenue_change || "0%",
+            trend: statsData?.revenue_trend || "up",
             icon: DollarSign,
             color: "text-emerald-400",
             bg: "bg-emerald-400/10",
@@ -90,8 +82,8 @@ export default function DashboardPage() {
         {
             title: "Orders Today",
             value: (statsData?.today_orders || 0).toString(),
-            change: "+8.2%",
-            trend: "up",
+            change: statsData?.orders_change || "0%",
+            trend: statsData?.orders_trend || "up",
             icon: ShoppingBag,
             color: "text-blue-400",
             bg: "bg-blue-400/10",
@@ -99,9 +91,9 @@ export default function DashboardPage() {
         },
         {
             title: "New Customers",
-            value: "12",
-            change: "-3.1%",
-            trend: "down",
+            value: (statsData?.new_customers || 0).toString(),
+            change: statsData?.customers_change || "0%",
+            trend: statsData?.customers_trend || "up",
             icon: Users,
             color: "text-violet-400",
             bg: "bg-violet-400/10",
@@ -110,8 +102,8 @@ export default function DashboardPage() {
         {
             title: "Avg Order Value",
             value: formatCurrency(statsData?.avg_order_value || 0),
-            change: "+2.4%",
-            trend: "up",
+            change: statsData?.aov_change || "0%",
+            trend: statsData?.aov_trend || "up",
             icon: CreditCard,
             color: "text-amber-400",
             bg: "bg-amber-400/10",
@@ -250,7 +242,7 @@ export default function DashboardPage() {
                                 paddingAngle={3}
                                 dataKey="value"
                             >
-                                {categoryData.map((_, index) => (
+                                {categoryData.map((_: any, index: number) => (
                                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                 ))}
                             </Pie>
@@ -268,7 +260,7 @@ export default function DashboardPage() {
                         </PieChart>
                     </ResponsiveContainer>
                     <div className="space-y-1.5 mt-2">
-                        {categoryData.slice(0, 4).map((item, i) => (
+                        {categoryData.slice(0, 4).map((item: any, i: number) => (
                             <div key={item.name} className="flex items-center gap-2 text-xs">
                                 <div
                                     className="w-2 h-2 rounded-full flex-shrink-0"
@@ -377,7 +369,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Monthly Revenue Bar Chart */}
-            <div className="bg-card border border-border rounded-xl p-5">
+            {/* <div className="bg-card border border-border rounded-xl p-5">
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h3 className="font-semibold text-foreground">Monthly Revenue</h3>
@@ -416,7 +408,7 @@ export default function DashboardPage() {
                         <Bar dataKey="revenue" fill="hsl(262.1, 83.3%, 57.8%)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
-            </div>
+            </div> */}
         </div>
     );
 }

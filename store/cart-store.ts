@@ -12,7 +12,10 @@ interface CartStore {
     note: string;
     companyGst: string;
 
+    tenantId: string | null;
+
     // Actions
+    setTenantId: (tenantId: string) => void;
     addItem: (product: Product) => void;
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
@@ -42,6 +45,15 @@ export const useCartStore = create<CartStore>()(
             taxRate: 8.5,
             note: "",
             companyGst: "",
+            tenantId: null,
+
+            setTenantId: (tenantId) => {
+                const currentTenant = get().tenantId;
+                if (currentTenant && currentTenant !== tenantId) {
+                    get().clearCart();
+                }
+                set({ tenantId });
+            },
 
             addItem: (product) => {
                 const items = get().items;

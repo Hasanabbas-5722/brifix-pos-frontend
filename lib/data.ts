@@ -4,7 +4,7 @@ export const PRODUCTS: Product[] = [
     {
         id: "p1",
         name: "Caramel Macchiato",
-        sku: "BEV-001",
+
         barcode: "8901234567890",
         category: "beverages",
         price: 5.99,
@@ -21,7 +21,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p2",
         name: "Green Tea Latte",
-        sku: "BEV-002",
         barcode: "8901234567891",
         category: "beverages",
         price: 4.99,
@@ -38,7 +37,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p3",
         name: "Iced Americano",
-        sku: "BEV-003",
         barcode: "8901234567892",
         category: "beverages",
         price: 3.99,
@@ -55,7 +53,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p4",
         name: "Chocolate Croissant",
-        sku: "FOOD-001",
         barcode: "8901234567893",
         category: "food",
         price: 3.49,
@@ -72,7 +69,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p5",
         name: "Avocado Toast",
-        sku: "FOOD-002",
         barcode: "8901234567894",
         category: "food",
         price: 8.99,
@@ -89,7 +85,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p6",
         name: "Blueberry Muffin",
-        sku: "FOOD-003",
         barcode: "8901234567895",
         category: "food",
         price: 2.99,
@@ -106,7 +101,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p7",
         name: "Wireless Earbuds",
-        sku: "ELEC-001",
         barcode: "8901234567896",
         category: "electronics",
         price: 79.99,
@@ -123,7 +117,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p8",
         name: "Phone Charger 65W",
-        sku: "ELEC-002",
         barcode: "8901234567897",
         category: "electronics",
         price: 29.99,
@@ -140,7 +133,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p9",
         name: "Cotton T-Shirt",
-        sku: "CLO-001",
         barcode: "8901234567898",
         category: "clothing",
         price: 19.99,
@@ -157,7 +149,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p10",
         name: "Leather Wallet",
-        sku: "ACC-001",
         barcode: "8901234567899",
         category: "accessories",
         price: 45.99,
@@ -174,7 +165,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p11",
         name: "Vitamin C Serum",
-        sku: "HLT-001",
         barcode: "8901234568001",
         category: "health",
         price: 24.99,
@@ -191,7 +181,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p12",
         name: "Notebook A5",
-        sku: "STA-001",
         barcode: "8901234568002",
         category: "stationery",
         price: 7.99,
@@ -208,7 +197,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p13",
         name: "Cold Brew Coffee",
-        sku: "BEV-004",
         barcode: "8901234568003",
         category: "beverages",
         price: 4.49,
@@ -225,7 +213,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p14",
         name: "Banana Bread",
-        sku: "FOOD-004",
         barcode: "8901234568004",
         category: "food",
         price: 4.99,
@@ -242,7 +229,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p15",
         name: "Smartwatch Band",
-        sku: "ACC-002",
         barcode: "8901234568005",
         category: "accessories",
         price: 14.99,
@@ -259,7 +245,6 @@ export const PRODUCTS: Product[] = [
     {
         id: "p16",
         name: "Lemon Sparkling Water",
-        sku: "BEV-005",
         barcode: "8901234568006",
         category: "beverages",
         price: 2.49,
